@@ -1,0 +1,14 @@
+
+model {
+  for (i in 1:27) {
+    oxide[i] ~ dnorm(mu[type[i], location[i]], 1/vr[type[i]])
+  }
+  # Priors
+  for (i in 1:3) {
+    for (j in 1:3) {
+      mu[i,j] ~ dnorm(90, 0.01)
+    }
+    vr[i] ~ dgamma(6,0.5)
+  }
+}
+

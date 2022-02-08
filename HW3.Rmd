@@ -1,0 +1,81 @@
+---
+title: "HW 3"
+author: "Garrett Carr"
+date: "1/25/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(R2jags)
+
+set.seed(24601)
+n_samples <- 100
+ricky_mean <- 51
+ricky_sd <- 12
+paul_mean <- 48
+paul_sd <- 10
+
+ricky <- rnorm(n_samples, mean = ricky_mean, sd = ricky_sd)
+paul <- rnorm(n_samples, mean = paul_mean, sd = paul_sd)
+
+dat <- tibble(player = c(rep(1,n_samples), rep(2,n_samples)),
+                  score = c(ricky, paul))
+```
+
+
+```{r Problem 1}
+dat %>% group_by(player) %>% summarise(
+  avg_score = mean(score),
+  score_sd = sd(score),
+  .groups = 'keep'
+)
+
+# vs
+
+tibble(player = c(1,2), mean = c(ricky_mean, paul_mean), sd = c(ricky_sd, paul_sd))
+```
+ The data is pretty close.
+ 
+```{r part 2}
+ggplot(data = dat, mapping = aes(x = score, group = player)) +
+  geom_density(alpha = 0.4, aes(color = as_factor(player), fill = as_factor(player)))
+```
+ It seems that statistically, paul might be better because he has a higher average
+ score, but he is not as consistent.
+
+
+```{r part3}
+mdl <- "
+model {
+  for (i in 1:32) {
+    y[i] ~ dnorm(mu[tmt1[i],tmt2[i]],1/vr)
+  }
+  for (i in 1:4) {
+  for (j in 1:4) {
+    mu[i,j] ~ dnorm(0,0.01)
+  }
+  }
+  vr ~ dgamma(3, .3)
+}
+"
+writeLines(mdl, 'a4x4.txt')
+y <- dat4x4$y
+tmt1 <- dat4x4$tmt1
+tmt2 <- dat4x4$tmt2
+data.jags <- c('y', 'tmt1', 'tmt2')
+parms <- c('mu', 'vr')
+
+a4x4.sim <- jags(data = data.jags, inits = NULL, parameters.to.save = parms, model.file='a4x4.txt',
+                 n.chains = 3, n.iter = 5000, n.burnin = 1000, n.thin = 4)
+
+library(coda)
+sims <- as.mcmc(a4x4.sim)
+
+chains <- as.matrix(sims)
+
+m44m42 <- chains[,17] - chains[,15]
+mean(m44m42 >0)
+```
+

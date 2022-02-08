@@ -1,0 +1,156 @@
+---
+title: "Stat 251 Final Exam"
+author: "FirstName LastName"
+date: "12/13/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.width=6, fig.height=4.5, fig.align='center')
+```
+
+## Problem [choose 1 or 2]
+
+Chosen problem 1
+a. 
+```{r answera}
+# Priors
+lambda.p <- 0
+tau2.p <- 1000
+alpha.p <- 2
+beta.p <- 20
+```
+We set our prior parameters.
+
+    beta_0 ~ N(0, 1000)
+    beta_1 ~ N(0, 1000)
+    sigma^2 ~ Gamma(2, 20)
+    
+Since we know the full conditionals of $\beta_0$ and $\beta_1$, we use that and draw random samples from them.
+
+```{r answe-a-cont}
+x_i <- c(30.8, 26.4, 26.9, 27.9, 27.9, 26.8, 29, 29.8, 27.2, 29.7)
+y_i <- c(0.516, 0.376, 0.37, 0.434, 0.427, 0.382, 0.458, 0.455, 0.386, 0.490)
+n <- 10
+```
+
+We have to compute $\sigma^2$ first, since it's part of the full conditional of the betas.
+
+```{r}
+
+# Loglik function
+loglik <- function(beta0, beta1, sigma2){
+  sum(dnorm(y_i, beta0 + x_i*beta1, sqrt(sigma2), log=TRUE))
+}
+
+# Betas
+log.beta0 <- function(sigma2val, beta1val) {
+  dnorm((1000*sum(y_i - beta1val*x_i))/(1000*n + sigma2val), 
+         sqrt(1000 * sigma2val/(1000*n + sigma2val)), 
+         log=TRUE)
+}
+
+log.beta1 <- function(sigma2val, beta0val) {
+  dnorm((1000*sum((y_i - beta0val)*x_i))/(1000*sum(x_i^2) + sigma2val), 
+         sqrt(1000 * sigma2val/(1000*sum(x_i^2) + sigma2val)), 
+         log=TRUE)
+}
+
+# Prior for sigma2
+
+logprior.sigma2 <- function(sigma2val, alpha.p, beta.p) {
+  dgamma(sigma2val, alpha.p, beta.p, log = TRUE)
+}
+```
+
+```{r MCMC}
+# MCMC setup!
+iters <- 1000000
+beta0.save <- rep(0, iters)
+beta1.save <- rep(0, iters)
+sigma2.save <- rep(0, iters)
+beta0 <- -0.5
+beta1 <- 0.03
+sigma2 <- .0001
+s.beta0 <- 0.005 # Step size
+s.beta1 <- 0.0008 # Step size
+s.sigma2 <- 0.0005
+accept.beta0 <- 0
+accept.beta1 <- 0
+accept.sigma2 <- 0
+
+# MCMC
+for(t in 1:iters){
+  # Sampling from sigma2 full conditional
+  sigma2.dot <- rnorm(1, sigma2, s.sigma2) #proposed value
+  if(sigma2.dot > 0){
+    logr <- loglik(beta0, beta1, sigma2.dot) + logprior.sigma2(sigma2.dot, alpha.p, beta.p) -
+      loglik(beta0, beta1, sigma2) - logprior.sigma2(sigma2, alpha.p, beta.p)
+    logunif <- log(runif(1))
+    if(logunif < logr){
+      sigma2 <- sigma2.dot
+      accept.sigma2 <- accept.sigma2 + 1
+    }
+  }
+  sigma2.save[t] <- sigma2
+
+  beta0.dot <- rnorm(1, beta0, s.beta0) # new proposed value for beta0
+  logr <- loglik(beta0.dot, beta1, sigma2) + log.beta0(sigma2, beta1) - log.beta0(sigma2, beta1) - loglik(beta0, beta1, sigma2)
+  logunif <- log(runif(1))
+  if(logunif < logr){
+    beta0 <- beta0.dot
+    accept.beta0 <- accept.beta0 + 1
+  }
+  beta0.save[t] <- beta0
+
+  beta1.dot <- rnorm(1, beta1, s.beta1) # new proposed value for beta1
+  logr <- loglik(beta0, beta1.dot, sigma2) + log.beta1(sigma2, beta0) - log.beta1(sigma2, beta0) - loglik(beta0, beta1, sigma2)
+  logunif <- log(runif(1))
+  if(logunif < logr){
+    beta1 <- beta1.dot
+    accept.beta1 <- accept.beta1 + 1
+  }
+  beta1.save[t] <- beta1
+}
+```
+Checking acceptance rates and trace plots.
+
+
+
+b. 
+```{r answerb}
+accept.sigma2/iters
+accept.beta0/iters
+accept.beta1/iters
+
+plot(sigma2.save, type = "l")
+plot(beta0.save, type = "l")
+plot(beta1.save, type = "l")
+```
+  
+
+c. 
+```{r answerc}
+plot(density(beta1.save))
+```
+
+
+d. 
+```{r answerd}
+interval <- quantile(beta1.save, c(0.025, 0.975))
+interval
+```
+We can say that for every 1 degree increase in temperature (F), we have an average increase in weight between `r round(interval[[1]], 3)` and `r round(interval[[2]], 3)` lbs per cubic foot, with 95% probability.
+
+e. 
+```{r answere}
+# compute using drawn values and monte carlo approximation
+# y_i = beta0.save + x_i*beta1.save + sqrt(sigma2.save) (error)
+
+y <- rnorm(length(beta0.save), beta0.save + 25*beta1.save, sqrt(sigma2.save))
+
+interval <- quantile(y, c(0.025, 0.975))
+interval
+```
+On a randomly selected day with a temperature of 25 degrees F, based on our data and prior knowledge there is a 95% probability of the snow weight being between `r round(interval[[1]], 3)` and `r round(interval[[2]], 3)` lbs per cubic foot, with 95% probability.
+

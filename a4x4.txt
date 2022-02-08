@@ -1,0 +1,13 @@
+
+model {
+  for (i in 1:32) {
+    y[i] ~ dnorm(mu[tmt1[i],tmt2[i]],1/vr)
+  }
+  for (i in 1:4) {
+  for (j in 1:4) {
+    mu[i,j] ~ dnorm(0,0.01)
+  }
+  }
+  vr ~ dgamma(3, .3)
+}
+

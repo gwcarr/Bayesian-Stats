@@ -1,0 +1,69 @@
+---
+title: "HW 2"
+author: "Garrett Carr"
+date: "1/25/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+
+
+# Posterior Distribution
+
+$$
+(\sigma^2)^{10-1-25/2} * \text{exp}\left(-\left[\frac{1}{2\sigma^2} \sum^n_{i=1}(x_i - \mu)^2+\frac{1}{2 * 20^2}(\mu - 100)^2 + 0.1\sigma^2\right] \right)
+$$
+
+```{r part 2}
+set.seed(8675309)
+data <- rnorm(25, mean = 100, sd = 10)
+
+
+logPost <- function(mu, sigma2) {
+  sum(dnorm(data, mu, sqrt(sigma2), log = TRUE)) +
+    dnorm(mu, mu_0, sigma_0, log = TRUE) +
+    dgamma(sigma2, shape = alpha_0, rate = beta_0, log = TRUE)
+}
+
+mu_0 <- 100
+sigma_0 <- 20
+alpha_0 <- 10
+beta_0 <- 0.1
+
+nDraws <- 5000
+out <- matrix(nrow = nDraws, ncol = 2)
+
+candSigMu <- 5
+candSigS <- 100
+cntr_Mu <- cntr_S2 <- 0
+
+out[1,] <- c(100, 100)
+for (i in 2:nDraws) {
+  candMu <- rnorm(1, out[i-1,1], sd = candSigMu)
+  r_Mu <- logPost(candMu, out[i-1,2]) - logPost(out[i-1,1], out[i-1,2])
+  if (r_Mu > log(runif(1))) {
+    out[i,1] <- candMu
+    cntr_Mu <- cntr_Mu + 1
+  } else {
+    out[i,1] <- out[i-1,1]
+  }
+  candS2 <- rnorm(1, out[i-1,2], sd = candSigS)
+  if (candS2 >= 0) {
+    r_S2 <- logPost(out[i,1], candS2) - logPost(out[i,1], out[i-1,2])
+    if (r_S2 > log(runif(1))) {
+      2
+      out[i,2] <- candS2
+      cntr_S2 <- cntr_S2 + 1
+    } else {
+      out[i,2] <- out[i-1,2]
+    }
+  } else {
+    out[i,2] <- out[i-1,2]
+  }
+}
+```
+
