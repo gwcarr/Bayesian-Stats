@@ -16,3 +16,26 @@ mdl <- "
   }
 "
 
+writeLines(mdl, 'linreg.txt')
+
+x <- regdat$CouponRate
+y <- regdat$BidPrice
+
+data.jags <- c('x', 'y')
+parms <- c('b0', 'b1', 'vr')
+
+linreg.sim <- jags(data=data.jags, inits = NULL, parameters.to.save = parms,
+                   model.file = 'linreg.txt', n.iter = 10000, n.burnin = 1000,
+                   n.chains = 4, n.thin = 3)
+
+linreg.sim
+
+sims <- as.mcmc(linreg.sim)
+gelman.diag(sims)
+chains <- as.matrix(sims)
+sims <- as.mcmc(chains)
+raftery.diag(sims)
+effectiveSize(sims)
+autocorr.diag(sims)
+geweke.diag(sims)
+
