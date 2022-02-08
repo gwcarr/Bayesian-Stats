@@ -39,3 +39,7 @@ effectiveSize(sims)
 autocorr.diag(sims)
 geweke.diag(sims)
 
+chains[1,]
+b0 <- chains[,1]
+b1 <- chains[,2]
+plot(density(b1))
