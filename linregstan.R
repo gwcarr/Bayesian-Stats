@@ -6,11 +6,11 @@ linreg_dat <- list(N=N,y=y,x=x)
 library(rstan)
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
-fit <- stan(file = 'linregmodel.stan', data = linreg_dat, 
+fit <- stan(file = 'linregmodel.stan', data = linreg_dat,
             iter = 9000, warmup=1000, thin = 2, chains = 4)
-summary(fit,pars=c('beta0','beta1','sigma2'),)$summary
-summary(fit,pars=c('beta0','beta1','sigma2'),probs=c(.025,.975))$summary
-summary(fit,pars=c('beta0','beta1','sigma2'),probs=c(.025,.975))$c_summary
+summary(fit,pars=c('beta0','beta1','sigma2'),)$summary #overall
+summary(fit,pars=c('beta0','beta1','sigma2'),probs=c(.025,.975))$summary #only 95% prob interval
+summary(fit,pars=c('beta0','beta1','sigma2'),probs=c(.025,.975))$c_summary # for each chain
 draws <- as.array(fit,pars=c('beta0','beta1','sigma2'))
 samps <- extract(fit)
 names(samps)
@@ -18,7 +18,7 @@ chains <- cbind(samps[[1]],samps[[2]],samps[[5]])
 colnames(chains) <- c('b0','b1','s2')
 library(coda)
 test <- As.mcmc.list(fit)
-gelman.diag(test)
+gelman.diag(test) #only works sometimes (Cholesky error)
 dim(draws)
 test1 <- as.mcmc(draws[1:4000,1,1])
 test2 <- as.mcmc(draws[1:4000,2,1])
