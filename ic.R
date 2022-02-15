@@ -5,10 +5,10 @@ N <- length(y)
 linreg_dat <- list(N=N,y=y,x=x)
 library(rstan)
 options(mc.cores = parallel::detectCores())
-fitic <- stan(file = 'ic.stan', data = linreg_dat, 
+fitic <- stan(file = 'ic.stan', data = linreg_dat,
             iter = 9000, warmup=1000, thin = 2, chains = 4)
 LLa <- as.array(fitic,pars='log_lik')
-library(loo)
+library(loo) # Leave One out cross validation for waic
 waic(LLa)
 loo1 <- loo(fitic,pars='log_lik')
 loo1
