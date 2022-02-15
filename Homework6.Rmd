@@ -1,0 +1,62 @@
+---
+title: "Homework 6"
+author: 'Garrett Carr'
+output: pdf_document
+---
+
+Welcome to homework 6! 
+
+For this homework, we want you to use the VO2.dat dataset to predict MaxVO2ML (maximum squared milliliters of air in lungs) based on the other covariates in the dataset. The idea is simple here. Find the "best" model.
+
+Finding the "best" model is obviously subjective. We define the "best" model here to excel in both information criterion and interpretability. In identifying this model, use one of the probabilistic programming languages (PPLs), such as JAGS or Stan, that we have been using in class to build the model. 
+
+When you have decided on a model that you feel is justified, report all useful convergence diagnostics and information criterion. After deciding on a model, REPLICATE this model in both JAGS and Stan. It is expected that you will have attempted multiple different models, but only report statistics for a single model (using both languages).
+
+For the grading of this assignment, we expect you to explain your reasoning and provide interpretation for the model you choose. 
+
+There is added incentive to this assignment. The top 2 students with lowest reported WAIC plus a complexity penalty will each be awarded 2 bonus points to their assignment. The catch is that the WAIC will be penalized for complexity (number of terms). For the penalization, each individual covariate in the model will receive 1 point of penalty, and interactions will receive 2 penalty points. A model has to be simple and effective.
+
+
+```{r setup}
+library(cmdstanr)
+library(rstan)
+library(tidyverse)
+library(posterior)
+library(bayesplot)
+
+# Read in Data
+dat <- read.table('vo2.dat', header = TRUE) %>% 
+  as_tibble()
+
+# Create data list
+data_list <- list(
+  N = count(dat)[[1]],
+  y = dat$MaxVO2ML,
+  gender = dat$Gender,
+  age = dat$Age1,
+  bmi = dat$BMI,
+  hr = dat$HR,
+  rpe = dat$RPE
+)
+
+rstan_options(auto_write = TRUE)
+```
+
+
+
+```{r model1, error=FALSE}
+# Inital stan model
+
+mod <- stan_model(file='vo2.stan')
+
+fit <- mod$sample(
+    data = data_list, 
+    seed = 123, 
+    chains = 4, 
+    parallel_chains = 4,
+    refresh = 500
+)
+
+fit$summary()
+```
+

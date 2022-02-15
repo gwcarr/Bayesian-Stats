@@ -21,7 +21,7 @@ transformed parameters{
   real <lower=0> sig2;
   sig2 = sigma^2;
   for (i in 1:N){
-    mu[i] = b0 + bage*age[i] + bgen*gender[i] + bbmi*bmi[i] + 
+    mu[i] = b0 + bage*age[i] + bgen*gender[i] + bbmi*bmi[i] +
             bhr*hr[i] + brpe*rpe[i];
   }
 }
@@ -36,7 +36,7 @@ model {
   bhr ~ normal(0,100);
   brpe ~ normal(0,100);
   sigma ~ gamma(2,.25);
-  
+
 }
 generated quantities {
   vector[N] log_lik;
