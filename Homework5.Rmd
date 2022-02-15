@@ -1,0 +1,72 @@
+---
+title: "Stat 451 - Homework 5"
+author: 'Due: 2/10 Before Class'
+# date: "2/2/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(R2jags)
+```
+
+### Introduction
+BEFORE STARTING(!!!): REMEMBER THAT BAYESIANS USE THEIR PRIOR KNOWLEDGE TO INFLUENCE THEIR BELIEFS. Looking at the data to inform your priors is considered 'double-dipping' into the data. Before reading in the data, gather some intuition about the number of hot dogs that an AVERAGE person can eat in 1 minute (don't think too hard -- experiments welcome :) ) and the number of miles that an average student can run. These ideas will influence your priors for this homework.
+
+### Data
+In a wild turn of events, you are asked to provide some understanding about the number of hot dogs (per minute) that some amateur, hot-dog-eating BYU statistics students can scarf down. Data provided to you is the number of `hot dogs` (per minute) that these students can eat and the maximum number of `miles` that these students can run. Read in the data as:
+
+```{r}
+dat <- read.table("linregdata.dat", header=TRUE)
+colnames(dat) <- c('contestant', 'miles_run', 'hotdogs_minute')
+# dat
+```
+
+
+### Assignment
+* 1. Write JAGS code to perform a Bayesian Linear Regression with `hot dogs per minute` as the response variable and `running miles` as the explanatory variable. 
+  + 1.a Use your intuition gathered to set appropriate priors on the parameters $\beta_0$, $\beta_1$, and $\sigma^2$.
+  + 1.b Assess convergence of parameters using trace plots and convergence diagnostics. Note in your answers what appropriate ranges are for the diagnostics and why you believe that your draws did/didn't converge.
+```{r part1}
+# linear model
+mdl <- "
+  model {
+
+    for (i in 1:31) {
+      y[i] ~ dnorm(mu[i], 1/vr)
+      mu[i] <- b0 + b1*x[i]
+    }
+    b0 ~ dnorm(1, 10)
+    b1 ~ dnorm(0.5, 1)
+    vr ~ dgamma(1.1, 0.1)
+  }
+"
+
+
+writeLines(mdl, 'linreg.txt')
+
+x <- dat$miles_run
+y <- dat$hotdogs_minute
+
+data.jags <- c('x', 'y')
+parms <- c('b0', 'b1', 'vr')
+
+linreg.sim <- jags(data=data.jags, inits = NULL, parameters.to.save = parms,
+                   model.file = 'linreg.txt', n.iter = 4000, n.burnin = 1000,
+                   n.chains = 4, n.thin = 3)
+
+linreg.sim
+```
+
+* 2. Plot a fitted values line (for reasonable values of miles run) on a scatterplot of your data.
+  + 2.a Add confidence intervals around the line, denoting our uncertainty of $E(Y|X)$. Color and label the lines.
+  + 2.b Add prediction intervals around the line, denoting our uncertainty of a future prediction. Color and label the lines.
+
+* 3. Explain how Bayesian Linear Regression differs from Frequentist Liner Regressiona.
+
+* 4. Joey Chestnut, the world record holder hot dog eater, can eat 7.6 hot dogs per minute. He can also run 7.25 miles. Does he fall outside the prediction intervals for a person who can run 7.25 miles? What is his error, $\epsilon_{Joey} = \hat{y}_{Joey} - y_{joey}$?
+
+
+
+
+
