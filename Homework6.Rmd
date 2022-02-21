@@ -23,6 +23,7 @@ library(rstan)
 library(tidyverse)
 library(posterior)
 library(bayesplot)
+library(R2jags)
 
 # Read in Data
 dat <- read.table('vo2.dat', header = TRUE) %>% 
@@ -44,19 +45,51 @@ rstan_options(auto_write = TRUE)
 
 
 
-```{r model1, error=FALSE}
+```{r model1, echo=FALSE, cache=TRUE}
 # Inital stan model
 
 mod <- stan_model(file='vo2.stan')
 
-fit <- mod$sample(
-    data = data_list, 
-    seed = 123, 
-    chains = 4, 
-    parallel_chains = 4,
-    refresh = 500
-)
+fit <- sampling(mod, data_list, iter = 9000, warmup=1000, thin = 2, chains = 4)
 
-fit$summary()
+fit2 <- stan(file='vo2.stan', data = data_list, iter = 15000, warmup = 3000, chains = 4, thin = 1)
+```
+
+```{r jags-model}
+mdl <- "
+  model {
+
+    for (i in 1:31) {
+      y[i] ~ dnorm(mu[i], 1/vr)
+      mu[i] <- b0 + bage*age[i] + bgen*gen[i] + bbmi*bmi[i] + bhr*hr[i] + brpe*rpe[i]
+    }
+    b0 ~ dnorm(20,10)
+    bage ~ dnorm(0,10)
+    bgen ~ dnorm(0,10)
+    bbmi ~ dnorm(0,10)
+    bhr ~ dnorm(0,10)
+    brpe ~ dnorm(0,10)
+    vr ~ dgamma(4,.25)
+  }
+"
+
+writeLines(mdl, 'vo2reg.txt')
+
+
+y <- dat$MaxVO2ML
+age <- dat$Age1
+gen <- dat$Gender
+bmi <- dat$BMI
+hr <- dat$HR
+rpe <- dat$RPE
+
+data.jags <- c('y', 'age', 'gen', 'bmi', 'hr', 'rpe')
+parms <- c('b0', 'bage', 'bgen', 'bbmi', 'bhr', 'brpe', 'vr')
+
+vo2reg.sim <- jags(data=data.jags, inits = NULL, parameters.to.save = parms,
+                   model.file = 'vo2reg.txt', n.iter = 4000, n.burnin = 1000,
+                   n.chains = 4, n.thin = 3)
+
+vo2reg.sim
 ```
 
