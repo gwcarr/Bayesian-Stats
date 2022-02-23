@@ -1,0 +1,311 @@
+---
+title: "Carr Exam 1"
+author: "Garrett Carr"
+date: "Due: 2/22/2022 At Midnight"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.align = 'center')
+dat <- read.table('exam1-1.dat', header = TRUE)
+library(R2jags)
+library(coda)
+```
+
+This is a take-home exam.  The exam is due on Thursday, February 22, at midnight.  Please complete the exam
+using a Markdown file.  Please email your completed exam to mckayc.647@gmail.com prior to the deadline by replying to the email chain that this exam arrived in.  Please email both your Markdown file (.Rmd) and your output file.  Please knit the document as a PDF.  Your files should be named 'lastname_exam1.Rmd' and 'lastname_exam1.PDF' where lastname is replaced with your last name.  Make sure you show your code as well as your answers. Include necessary comments. I am not concerned about how you choose to do this, as long as all code and output are included in the exam document in the appropriate order. Double check that all of your code and output is visible in your output file.
+
+Take-home exams should
+be your own work.  However, you are welcome to use class notes, and help documentation publicly 
+available for all the programs we have used.  You should not search the web for similar problems
+which someone else may have solved.  You should not discuss the exam with any living person.  
+The data for the exam are in data files that I will email to you.
+
+For the first set of problems use the data file 'exam1-1.dat'.  There are 24 data points in 8 treatments. We will
+assume the likelihood for the data is normal.
+You should assume that the variance is homoscedastic across
+treatments (that is, the variance is the same in all the treatments). 
+Use the following priors: Normal(mean=5,prec=.0001) for the cell means, and a gamma(shape=1.5,rate=.5) for
+the variance.  Besides examining the posteriors of the eight cell means and the variance, you will also be 
+examining three other functions of the parameters: (1) the average of the first four cell means, (2) the
+average of the last four cell means, and (3) the average of the last four cell means 
+minus the average of the first four cell means.
+
+1.  Write the JAGS code necessary to produce posterior chains for the eight cell means and the variance.  Put a set.seed(1234)
+command in the file prior to running the JAGS code so that we will all get the same answers.  Run 4 chains with 11000 iterations
+per chain, a burnin of 1000 and thin by 4.  This will result in 10000 samples. Print out the JAGS 
+output file.
+
+```{r Q1}
+mdl1 <- "
+  model {
+    
+    for (i in 1:24) {
+      y[i] ~ dnorm(mu[tmt[i]], 1/vr)
+    }
+    
+    for (i in 1:8) {
+      mu[i] ~ dnorm(5, 0.0001)
+    }
+    
+    vr ~ dgamma(1.5, 0.5)
+}
+"
+
+writeLines(mdl1, 'exam1.txt')
+y <- dat$y
+tmt <- dat$tmt
+
+data.jags <- c('y', 'tmt')
+parms <- c('mu', 'vr')
+
+set.seed(1234)
+dat.sim <- jags(data = data.jags, inits = NULL, parameters.to.save = parms, model.file='exam1.txt',
+                 n.chains = 4, n.iter = 11000, n.burnin = 1000, n.thin = 4)
+
+dat.sim
+
+```
+
+2.  Using coda, verify that the chains produced for the eight cell means, the variance, and the three functions of 
+the parameters described above are appropriate for further analysis by showing that the upper confidence interval of the Gelman-Rubin diagnostic is close to 1.
+
+```{r Q2}
+library(coda)
+sims <- as.mcmc(dat.sim)
+
+gelman.diag(sims)
+```
+
+
+3.  Using coda, verify that the chains produced for the eight cell means, the variance, and the three functions of 
+the parameters described above are appropriate for further analysis by showing that the effective sample
+size for each chain exceeds 5000.
+
+```{r Q3}
+effectiveSize(sims)
+```
+
+
+4. Using coda, verify that the chains produced for the eight cell means, the variance, and the three functions of 
+the parameters described above are appropriate for further analysis by showing that the Raftery-Lewis diagnostic
+for each chain is smaller than 3.
+
+```{r Q4}
+chains <- as.matrix(sims)
+tmt14 <- as.mcmc(rowMeans(chains[,2:5]))
+tmt58 <- as.mcmc(rowMeans(chains[,6:9]))
+tmtdiff <- as.mcmc(rowMeans(chains[,6:9])-rowMeans(chains[,2:5]))
+chains <- cbind(chains,as.matrix(tmt14), as.matrix(tmt58), as.matrix(tmtdiff))
+raftery.diag(chains)
+```
+
+
+5. Produce the trace plot for the mean parameter of treatment 1.
+
+```{r Q5}
+tmt1 <- as.mcmc(chains[,2])
+traceplot(tmt1)
+```
+
+
+6. Produce the density plot for the variance parameter.
+
+```{r Q6}
+vr <- chains[,10]
+plot(density(vr))
+```
+
+
+7. What is the equal tail 95\% posterior probability interval of the variance.
+
+```{r Q7}
+quantile(vr, c(0.025, 0.975))
+```
+
+
+8. What is the highest posterior density 95\% interval of the variance.
+
+```{r Q8}
+HPDinterval(as.mcmc(vr), prob = 0.95)
+```
+
+
+9. Say we want to know if the mean for treatment 1 is different than the mean of treatment 8.  Compute the
+chain that represents the difference of the mean of treatment 8 minus the mean of treatment 1.  Plot
+the density of this chain.
+
+```{r Q9}
+tmt8 <- chains[,9]
+tmt81 <- tmt8 - tmt1
+
+plot(density(tmt81), main = 'Difference of tmt8 and tmt1')
+
+```
+
+
+10. Would you conclude the mean of treatment 8 exceeds the mean of treatment 1?  Why?
+
+  Yes, because the bulk of the posterior distribution is above zero. In fact, 
+  we could conclude that with an estimated probability of `r mean(tmt81 > 0)`.
+  
+
+11. Compute pD using the JAGS formula using one of the chains you have already produced.
+
+```{r Q11}
+jags.samples(dat.sim$model, 'pD', n.iter = 11000)
+```
+  This is the effective number of parameters, based on the deviance. 
+
+12. How is the DIC for the model computed.
+
+  Deviance Information criteria is calculated based on the log likelihood for each iteration.
+  It's $0.5 \text{var}(-2\log(\text{LL})) + \text{mean}(-2*\log(\text{LL}))$.
+
+13. Say the first four treatment means represent 4 levels of a treatment.  We'll call this treatment A.  Say
+treatment means five through eight represent 4 levels of another treatment that we will call treatment B.
+Plot the posterior density for the combination of the parameters that you would use to test the assertion
+that treatment B yields higher responses that treatment A.
+
+```{r Q13}
+plot(density(tmtdiff), main = 'Difference of tmtA and tmtB')
+```
+
+
+14.  Would you conclude treatment B yields higher responses than treatment A?  Why?
+
+  Yes, because the posterior probability of Treatment B yielding higher responses than A is
+  approximately `r mean(tmtdiff > 0)`
+
+  For the next set of problems use the data file 'exam1-3.dat'.  Use a normal likelihood as you would with a standard
+  frequentist multiple regression.
+  For these data we are attempting to predict Defective using
+  Temperature, Density, and Rate.  Use the square root of Defective as the dependent variable, and
+  please standardize all variables (ie, subtract the mean and divide by the standard deviation, including the square    root of Defective) prior to running any model.
+  
+```{r Q14, include = FALSE}
+library(cmdstanr)
+standat <- read.table('exam1-3.dat', header = TRUE)
+standat$DefectiveSqrt <- sqrt(standat$Defective)
+standat$Defective <- NULL
+standat <- as.data.frame(scale(standat[2:5]))
+```
+  
+
+15. For the model include only main effects for Temperature, Density, and Rate.  Write code to 
+solve the problem in Stan. 
+Produce
+posterior chains for the parameters you are estimating.  Use normal priors for the $\beta$ parameters, N(0,sd=10),
+ and use a gamma with shape of 1.1 and a scale of 1 for the
+variance.  Also, set the seed value as 4321 so all output will be identical.
+Use 5500 for the number of iterations, 500 for the burn in iterations, use 5 chains, and don't thin. 
+Make sure the code has enough in it so that WAIC may be computed.  The answer to this question is your Stan code.
+
+```{r Q15}
+code <- "
+data {
+  int N;
+  real y[N];
+  real Temperature[N];
+  real Density[N];
+  real Rate[N];
+}
+parameters {
+  real <lower=0> sigma;
+  real b0;
+  real bTemp;
+  real bDens;
+  real bRate;
+}
+transformed parameters{
+  real mu[N];
+  real <lower=0> sig2;
+  sig2 = sigma^2;
+  for (i in 1:N){
+    mu[i] = b0 + bTemp*Temperature[i] + bDens*Density[i] + bRate*Rate[i];
+  }
+}
+model {
+  for (i in 1:N){
+    y[i] ~ normal(mu[i],sigma);
+  }
+  b0 ~ normal(0, 10);
+  bTemp ~ normal(0, 10);
+  bDens ~ normal(0, 10);
+  bRate ~ norma(0, 10);
+  sig2 ~ gamma(1.1, 1);
+
+}
+
+"
+
+data_list <- list(
+  N = dim(standat)[1],
+  y = standat$DefectiveSqrt,
+  Temperature = standat$Temperature,
+  Density = standat$Density,
+  Rate = standat$Rate
+)
+
+model2 <- cmdstan_model('midtermstan.stan')
+
+fit <- model2$sample(
+  data = data_list,
+  seed = 4321,
+  chains = 5,
+  parallel_chains = 4,
+  iter_warmup = 500,
+  iter_sampling = 5500,
+  
+)
+```
+I chose to run the stan code using CmdStanR, which precompiles the Stan program into C++ 
+as an executable, has the latest features of stan, and runs much quicker than RStan
+and crashes far less frequently.
+
+Execution time on my computer was about 7 seconds.
+
+
+
+16.  Verify that the chains you have produced have converged appropriately by examining (and reproducing) the effective sample size using coda.
+
+```{r}
+library(rstan)
+stanfit <- rstan::read_stan_csv(fit$output_files())
+
+samps <- extract(stanfit)
+names(samps)
+chains <- cbind(samps[[1]], samps[[2]], samps[[3]], samps[[4]], samps[[5]])
+colnames(chains) <- c("sigma","b0","bTemp","bDens","bRate")
+sims <- as.mcmc(chains)
+effectiveSize(sims)
+```
+
+
+17. Verify that the chains you have produced have converged appropriately by examining (and reproducing) the
+Raftery-Lewis diagnostics.  
+```{r Q17}
+raftery.diag(sims)
+```
+
+
+18.  Using coda, find 95% highest posterior density intervals for the parameters you have estimated.
+
+```{r Q18}
+HPDinterval(sims, prob = 0.95)
+```
+
+19.  What is the WAIC for the model?
+
+```{r Q19}
+LLa <- as.array(stanfit,pars='log_lik')
+library(loo) # Leave One out cross validation for waic
+waic(LLa)
+```
+
+
+20.  What is the leave one out information criterion for the model?
+```{r Q20}
+fit$loo()
+```
+

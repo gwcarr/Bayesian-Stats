@@ -45,7 +45,7 @@ rstan_options(auto_write = TRUE)
 
 
 
-```{r model1, echo=FALSE, cache=TRUE}
+```{r model1, cache=TRUE}
 # Inital stan model
 
 mod <- stan_model(file='vo2.stan')
@@ -55,11 +55,23 @@ fit <- sampling(mod, data_list, iter = 9000, warmup=1000, thin = 2, chains = 4)
 fit2 <- stan(file='vo2.stan', data = data_list, iter = 15000, warmup = 3000, chains = 4, thin = 1)
 ```
 
+```{r model1-waic}
+LLa <- as.array(fit2,pars='log_lik')
+library(loo) # Leave One out cross validation for waic
+waic(LLa)
+loo2 <- loo(fit2,pars='log_lik')
+loo2
+pareto_k_ids(loo2)
+pareto_k_values(loo2)
+pareto_k_influence_values(loo2)
+pareto_k_table(loo2)
+```
+
 ```{r jags-model}
 mdl <- "
   model {
 
-    for (i in 1:31) {
+    for (i in 1:120) {
       y[i] ~ dnorm(mu[i], 1/vr)
       mu[i] <- b0 + bage*age[i] + bgen*gen[i] + bbmi*bmi[i] + bhr*hr[i] + brpe*rpe[i]
     }
@@ -87,9 +99,78 @@ data.jags <- c('y', 'age', 'gen', 'bmi', 'hr', 'rpe')
 parms <- c('b0', 'bage', 'bgen', 'bbmi', 'bhr', 'brpe', 'vr')
 
 vo2reg.sim <- jags(data=data.jags, inits = NULL, parameters.to.save = parms,
-                   model.file = 'vo2reg.txt', n.iter = 4000, n.burnin = 1000,
-                   n.chains = 4, n.thin = 3)
+                   model.file = 'vo2reg.txt', n.iter = 10000, n.burnin = 1000,
+                   n.chains = 4, n.thin = 2)
 
 vo2reg.sim
+```
+It doesn't really seem like these models are too accurate. It would help if we had
+more informative priors. It also seems like these models should have different intercepts,
+depending on some of their groups. Perhaps it's related to the gender.
+
+I'm going to throw out the heart rate and respiration rate, as those are likely
+correlated with each other and seem to be highly variable anyways.
+
+
+```{r jags-model2}
+mdl2 <- "
+  model {
+
+    for (i in 1:120) {
+      y[i] ~ dnorm(mu[i], 1/vr)
+      mu[i] <- b0 + bage*age[i] + bgen*gen[i] + bbmi*bmi[i] + bmi[i]*gen[i]
+    }
+    b0 ~ dnorm(20,10)
+    bage ~ dnorm(0,10)
+    bgen ~ dnorm(0,10)
+    bbmi ~ dnorm(0,10)
+    vr ~ dgamma(4,.25)
+  }
+"
+
+writeLines(mdl2, 'vo2reg2.txt')
+
+
+y <- dat$MaxVO2ML
+age <- dat$Age1
+gen <- dat$Gender
+bmi <- dat$BMI
+hr <- dat$HR
+rpe <- dat$RPE
+
+data.jags <- c('y', 'age', 'gen', 'bmi')
+parms <- c('b0', 'bage', 'bgen', 'bbmi', 'vr')
+
+vo2reg2.sim <- jags(data=data.jags, inits = NULL, parameters.to.save = parms,
+                   model.file = 'vo2reg2.txt', n.iter = 10000, n.burnin = 2000,
+                   n.chains = 4, n.thin = 2)
+
+vo2reg2.sim
+```
+```{r diagnostics}
+sims <- as.mcmc(vo2reg2.sim)
+gelman.diag(sims)
+chains <- as.matrix(sims)
+sims <- as.mcmc(chains)
+raftery.diag(sims)
+effectiveSize(sims)
+autocorr.diag(sims)
+geweke.diag(sims)
+
+
+samples.m2 <- jags.samples(vo2reg2.sim$model,
+                           c("WAIC", "deviance"),
+                           type = 'mean',
+                          n.iter = 10000, 
+                          n.burnin = 2000,
+                          n.chains = 4, 
+                          n.thin = 2)
+
+samples.m2$p_waic <- samples.m2$WAIC
+samples.m2$waic <- samples.m2$deviance + samples.m2$p_waic
+tmp <- sapply(samples.m2, sum)
+waic.m2 <- round(c(waic = tmp[['waic']], p_waic = tmp[["p_waic"]]), 1)
+
+waic.m2
 ```
 

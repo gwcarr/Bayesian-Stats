@@ -1,7 +1,7 @@
 
   model {
 
-    for (i in 1:31) {
+    for (i in 1:120) {
       y[i] ~ dnorm(mu[i], 1/vr)
       mu[i] <- b0 + bage*age[i] + bgen*gen[i] + bbmi*bmi[i] + bhr*hr[i] + brpe*rpe[i]
     }

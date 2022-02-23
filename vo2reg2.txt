@@ -1,0 +1,14 @@
+
+  model {
+
+    for (i in 1:120) {
+      y[i] ~ dnorm(mu[i], 1/vr)
+      mu[i] <- b0 + bage*age[i] + bgen*gen[i] + bbmi*bmi[i] + bmi[i]*gen[i]
+    }
+    b0 ~ dnorm(20,10)
+    bage ~ dnorm(0,10)
+    bgen ~ dnorm(0,10)
+    bbmi ~ dnorm(0,10)
+    vr ~ dgamma(4,.25)
+  }
+
