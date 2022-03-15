@@ -1,0 +1,30 @@
+
+model {
+for (i in 1:24) {
+  yield[i] ~ dnorm(mu[i], 1/s2error)
+  mu[i] <- alpha0 + field[i] + seed[type[i]] + food[cultivar[i]] + interax[type[i], cultivar[i]]  
+}
+  alpha0 ~ dnorm(0, 0.000001)
+  for (i in 1:4) {
+    field[i] ~ dnorm(0, 0.01)
+  }
+  
+  for (i in 1:2) {
+    seed[i] ~ dnorm(30, 1/s2seed)
+  }
+  
+  for (i in 1:3) {
+    food[i] ~ dnorm(0, 1/s2cult)
+  }
+  
+  for (i in 1:2) {
+    for (j in 1:3) {
+      interax[i,j] ~ dnorm(0, 0.001)
+    }
+  }
+  s2error ~ dgamma(1.1, 0.05)
+  s2cult ~ dgamma(1.1, 0.05)
+  s2seed ~ dgamma(1.1, 0.05)
+  
+}
+

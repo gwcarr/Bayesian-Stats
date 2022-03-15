@@ -1,0 +1,114 @@
+---
+title: "Homework 7"
+author: 'Garrett Carr'
+output: pdf_document
+---
+
+For this assignment, your task is simple: The researchers want to know which seed type, cultivar, and/or seed type by cultivar has the best yield. 
+
+Use JAGS or Stan to perform this analysis. You will be graded on your ability to perform a complete analysis.
+
+```{r setup, include=FALSE}
+library(R2jags)
+cult <- read.table("cult.dat")
+colnames(cult) <- c('field', 'type', 'cultivar', 'yield')
+head(cult)
+cult$type <- as.factor(cult$type)
+cult$cultivar <- as.factor(cult$cultivar)
+```
+
+This is a classic split plot, with a potential interaction affect. Since we are interested
+ in whether seed type, cultivar, or a combination affects yield, I assumed that
+ any affects introduced by differences between fields were not interesting.
+
+```{r model1}
+model1 <- "
+model {
+for (i in 1:24) {
+  yield[i] ~ dnorm(mu[i], 1/s2error)
+  mu[i] <- alpha0 + field[i] + seed[type[i]] + food[cultivar[i]] + interax[type[i], cultivar[i]]  
+}
+  alpha0 ~ dnorm(0, 0.000001)
+  for (i in 1:4) {
+    field[i] ~ dnorm(0, 0.01)
+  }
+  
+  for (i in 1:2) {
+    seed[i] ~ dnorm(30, 1/s2seed)
+  }
+  
+  for (i in 1:3) {
+    food[i] ~ dnorm(0, 1/s2cult)
+  }
+  
+  for (i in 1:2) {
+    for (j in 1:3) {
+      interax[i,j] ~ dnorm(0, 0.001)
+    }
+  }
+  s2error ~ dgamma(1.1, 0.05)
+  s2cult ~ dgamma(1.1, 0.05)
+  s2seed ~ dgamma(1.1, 0.05)
+  
+}
+"
+
+writeLines(model1, 'hw7model.txt')
+
+field <- cult$field
+type <- cult$type
+cultivar <- cult$cultivar
+yield <- cult$yield
+
+data.jags <- c('field', 'type', 'cultivar', 'yield')
+parms <- c('seed', 'food', 'interax', 's2error', 's2cult', 's2seed', 'alpha0')
+
+cult.sim <- jags(model.file = 'hw7model.txt', data = data.jags, parameters.to.save = parms,
+                 n.iter = 5000, n.burnin = 1000, n.chains = 4, n.thin = 1, inits = NULL)
+
+cult.sim
+```
+It appears there is hardly a difference between seed one and two. 
+
+
+```{r model2}
+model2 <- "
+model {
+for (i in 1:24) {
+  yield[i] ~ dnorm(mu[i], 1/s2error)
+  mu[i] <- alpha0 + field[i] + seed[type[i]] + food[cultivar[i]] + interax[type[i], cultivar[i]]  
+}
+  alpha0 ~ dnorm(30, 0.0001)
+  for (i in 1:4) {
+    field[i] ~ dnorm(0, 0.01)
+  }
+  
+  for (i in 1:2) {
+    seed[i] ~ dnorm(0, 1/s2seed)
+  }
+  
+  for (i in 1:3) {
+    food[i] ~ dnorm(0, 1/s2cult)
+  }
+  
+  for (i in 1:2) {
+    for (j in 1:3) {
+      interax[i,j] ~ dnorm(0, 0.01)
+    }
+  }
+  s2error ~ dgamma(1.1, 0.05)
+  s2cult ~ dgamma(1.1, 0.05)
+  s2seed ~ dgamma(1.1, 0.05)
+  
+}
+"
+
+writeLines(model2, 'hw7model2.txt')
+
+cult.sim <- jags(model.file = 'hw7model2.txt', data = data.jags, parameters.to.save = parms,
+                 n.iter = 5000, n.burnin = 1000, n.chains = 4, n.thin = 1, inits = NULL)
+
+cult.sim
+```
+Just based on what we are seeing so far, I would say that the best bet is to use seed type 2
+with cultivation 3. So, type b, with liv as the food type.
