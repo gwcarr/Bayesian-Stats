@@ -16,36 +16,180 @@ operations that ended with the death of the patient.
 The idea behind the study is to rank the performances of the hospitals involved. I 
 assume you will do the problem using JAGS.  Please include relevant code with your answers.
 
+
+```{r setup}
+library(coda)
+library(R2jags)
+dat <- read.table('mortality.dat', header = TRUE)
+dat
+```
+
+
 1. Presumably, an appropriate way to rank the hospitals would be to model the proportion
 of operations that end in the death of the patient ($p_i$, where i indicates the $i^{th}$ hospital). The maximum likelihood estimates
 for those proportions would simply be the number of deaths divided by the number of
 operations. Compute the MLE for each hospital.
 
+```{r part 1}
+dat$p_i <- dat$deaths / dat$ops
+dat
+```
+
+
 2. Now, perform a Bayesian analysis where the proportion of deaths is modeled as a fixed
 effect.  That is, you should not use a hierarchical model.  Use a beta(1,1) prior for
 the $p_i$'s.  The answer for this problem is just the standard JAGS output.
 
+```{r part2}
+model1 <- "
+model{
+
+# Liklihood
+for (i in 1:11) {
+  effect[i] ~ dbin(prop[i], ops[i])
+}
+
+# Priors
+for (i in 1:11) {
+  prop[i] ~ dbeta(1,1)
+}
+}
+"
+writeLines(model1, 'exam2mdl1.txt')
+
+prop <- dat$p_i
+ops <- dat$ops
+
+data.jags <- c('prop', 'ops')
+parms <- c('effect')
+
+mort.sim <- jags(model.file = 'exam2mdl1.txt', data = data.jags, parameters.to.save = parms, n.iter = 10000, n.burnin = 1000, n.chains = 4, n.thin = 1, inits = NULL)
+
+mort.sim
+```
+
+
+
 3. Demonstrate that the parameters you are estimating in this model have converged.  Show
 effective sample sizes, autocorrelation, and the Raftery-Lewis diagnostic.
+
+```{r diagnostic3}
+sims <- as.mcmc(mort.sim)
+chains <- as.matrix(sims)
+sims <- as.mcmc(chains)
+effectiveSize(sims)
+autocorr.diag(sims)
+raftery.diag(sims)
+```
+Chains show convergence, as effective size is greater than 5000, autocorrelation is low,
+and raftery lewis diagnostic shows there were enough samples.
+
 
 4.  Now perform a Bayesian analysis where the proportion of deaths in modeled as a
 random effect.  That is, now use a hierarchical model for the $p_i$. Use a beta($\alpha$,$\beta$) prior for the $p_i$'s and gamma(1.1,1.1) for $\alpha$ and $\beta$.  The answer for this problem is
 just the standard JAGS output.
 
+```{r part4}
+model2 <- "
+model{
+
+# Liklihood
+for (i in 2:11) {
+  effect[i] ~ dbin(prop[i], ops[i])
+}
+
+# Priors
+for (i in 2:11) {
+  prop[i] ~ dbeta(alpha, beta) 
+}
+alpha ~ dgamma(1.1, 1.1)
+beta ~ dgamma(1.1, 1.1)
+}
+"
+writeLines(model2, 'exam2mdl2.txt')
+
+deaths <- dat$deaths
+
+
+data.jags <- c('prop', 'ops')
+parms <- c('effect')
+
+mort.sim2 <- jags(model.file = 'exam2mdl2.txt', data = data.jags, parameters.to.save = parms, n.iter = 5000, n.burnin = 1000, n.chains = 4, n.thin = 1)
+
+mort.sim2
+```
+There was a problem, because the proportion provided for hospital 1 is 0, since they have so few
+ops. The sampler doesn't like that, because there isn't any information on the likelihood for hospital 1,
+as there is no demonstrated track record, and the priors are uninformative. The estimate would be 0.
+
+Therefore, I only produced posteriors for hospitals 2-11, in order to follow the directions.
+
 5.  Demonstrate that the parameters you are estimating in this model have converged.  Show
 effective sample sizes, autocorrelation, and the Raftery-Lewis diagnostic.
+
+```{r diag5}
+sims2 <- as.mcmc(mort.sim2)
+chains2 <- as.matrix(sims2)
+sims2 <- as.mcmc(chains2)
+effectiveSize(sims2)
+autocorr.diag(sims2)
+raftery.diag(sims2)
+```
+
+Diagnostics looks good.
+
 
 6.  Produce a table with the MLE’s, the point estimates from the fixed effects model, and
 the point estimates from the random effects model side-by-side.
 
+```{r point-estimates}
+#         MLE       , model1,           model2
+hos1 <- c(dat$p_i[1], mean(chains[,2]), 0)
+hos2 <- c(dat$p_i[2], mean(chains[,5]), mean(chains2[,4]))
+hos3 <- c(dat$p_i[3], mean(chains[,6]), mean(chains2[,5]))
+hos4 <- c(dat$p_i[4], mean(chains[,7]), mean(chains2[,6]))
+hos5 <- c(dat$p_i[5], mean(chains[,8]), mean(chains2[,7]))
+hos6 <- c(dat$p_i[6], mean(chains[,9]), mean(chains2[,8]))
+hos7 <- c(dat$p_i[7], mean(chains[,10]), mean(chains2[,9]))
+hos8 <- c(dat$p_i[8], mean(chains[,11]), mean(chains2[,10]))
+hos9 <- c(dat$p_i[9], mean(chains[,12]), mean(chains2[,11]))
+hos10 <- c(dat$p_i[10], mean(chains[,3]), mean(chains2[,2]))
+hos11 <- c(dat$p_i[11], mean(chains[,4]), mean(chains2[,3]))
+
+df <- as.data.frame(rbind(hos1, hos2, hos3, hos4, hos5, hos6, hos7, hos8, hos9, hos10, hos11))
+colnames(df) <- c('MLE', 'fixed', 'random')
+
+df$fixed <- df$fixed/dat$ops
+df$random <- df$random/dat$ops
+df
+```
+
+
 7. Using the point estimates, which hospital seems to be the worst?
+
+It looks like hospital 8 is the worst.
 
 8. Using the point estimates, which hospital seems to be the second worst?
 
+It looks like hospital 11 is the second worst.
+
 9. Using the random effects model, would you say those two hospitals have significantly different proportions or neonatal mortalities at the 0.05 level?
+
+```{r}
+# Hospital 8
+HPDinterval(sims2[,10], 0.95)
+
+# Hospital 11
+HPDinterval(sims2[,3], 0.95)
+```
+It appears the only difference is one more death, so I would say the proportions are not significantly different. Hospital 11 just has more operations.
+
 
 10. Using the random effects model, which of these two hospitals would you prefer for your own family for neonatal
 surgery?
+
+I would probably pick Hospital 11 out of the two, because they have more experience doing the operations.
+
 
 11. (Bonus)  Using the random effects model, rank the hospitals by proportion of deaths (lowest proportion has rank 1) at each draw. Then produce a mean rank and standard deviation of that rank for each hospital.
 
@@ -64,8 +208,46 @@ prior predictive.  Draw 1000 values from the prior predictive and plot a histogr
 drawn from the prior predictive.  Remember that the values
 must be between 0 and 1.
 
+```{r part12, eval=FALSE}
+
+# Liklihood
+p[i] ~ dbeta(alpha, beta)
+
+# Priors
+alpha ~ dgamma(1, 0.2)
+beta ~ dgamma(1.5, 1)
+}
+```
+
+```{r part12b}
+prior <- rbeta(1000, rgamma(1000, 1, 0.2), rgamma(1000, 1.5, 1))
+hist(prior)
+```
+
+
 13. Write code in Stan to address the problem.  Use 20000 burnin and 100000 iterations, thin by 10 and produce 5 chains.  This will
 give you 40000 MCMC draws of the posterior.  Print the summary of the simulation. Also include your Stan code in the R script as comments. This will make it easier for the grader to identify any mistakes and give feedback. 
+
+
+```{r part13}
+library(cmdstanr)
+
+data <- c(0.857, 0.824, 0.820, 0.875, 0.844)
+
+"data {
+	int N;
+	int ratio[N];
+     }
+parameters {
+
+           }
+model {
+
+      }
+generated quantities {
+  vector[N] log_lik;
+}"
+```
 
 14.  Verify that the chains you have produced have converged appropriately and have enough information to use to make inference by examining (and reporting) the effective sample size.  Effective sample sizes should exceed 5000.
 

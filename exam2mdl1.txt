@@ -1,0 +1,14 @@
+
+model{
+
+# Liklihood
+for (i in 1:11) {
+  effect[i] ~ dbin(prop[i], ops[i])
+}
+
+# Priors
+for (i in 1:11) {
+  prop[i] ~ dbeta(1,1)
+}
+}
+
