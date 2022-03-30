@@ -1,0 +1,103 @@
+---
+title: "Dugong -- HW 9"
+author: "Garrett Carr"
+date: "Due March 29, 2022"
+output: pdf_document
+---
+
+
+These data concern growth of dugongs (sometimes called sea cows, an aquatic mammal found primarily in the Indo-West Pacific).  The
+data file is called 'dugong.dat' and contains two columns, the age of the animal in years, and the length of the animal in meters for 
+27 individuals.  If you plot the data, you will see that growth is faster for young animals and then seems to stop in older animals.
+This type of growth is called nonlinear growth, and the simplest curve to describe such growth is:
+\begin{equation}
+   y_i = a - bg^{x_i},
+\end{equation}
+where $y_i$ represents the length of the animal and $x_i$ represents the age of the animal.  As you can see, there are three parameters to
+estimate, $a, b,$ and $g$.  'a' represents the asymptote or value at which growth stops, 'b' is constrained to be positive, and 'g' is constrained 
+to be between 0 and 1.
+
+You have two tasks:
+
+1. Determine parameter estimates for the growth curve.
+2. Compare the results from JAGS to those from Stan.
+
+After making sure chains have converged appropriately, 
+you will compare the results by examining both equal tail and HPD interval estimates of the parameters (and functions thereof) that matter.
+
+You should hand in a no more than a one page summary of your results that should include at least one plot.  Make sure to address all appropriate model diagnostics and convergence, but note that you might not be able to fit code output in your one page summary. All code should come in as an appendix to your one 
+page summary. 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.align = 'center')
+library(rstan)
+library(R2jags)
+library(cmdstanr)
+library(loo)
+
+dugong <- read.table("dugong.dat", header=TRUE)
+dugong
+
+plot(dugong, ylim = c(0,2.8))
+```
+
+```{r model1}
+model1 <- "
+model {
+for (i in 1:27) {
+  y[i] ~ dnorm(mu[i], 1/s2error)
+  mu[i] = a - b*g^(x[i])
+}
+  a ~ dnorm(3, 0.001)
+  b ~ dgamma(6, 4)
+  g ~ dbeta(5.5, 1.5)
+  s2error ~ dgamma(1.1, 0.05)
+}
+"
+
+writeLines(model1, 'model1.txt')
+
+y <- dugong$length
+x <- dugong$age
+
+data.jags <- c('y', 'x')
+parms <- c('a', 'b', 'g', 's2error')
+
+dugong.sim <- jags(model.file = 'model1.txt', data = data.jags, parameters.to.save = parms,
+                 n.iter = 50000, n.burnin = 2000, n.chains = 4, n.thin = 1, inits = NULL)
+
+dugong.sim
+```
+```{r model1-diag}
+sims <- as.mcmc(dugong.sim)
+gelman.diag(sims)
+chains <- as.matrix(sims)
+sims <- as.mcmc(chains)
+raftery.diag(sims)
+effectiveSize(sims)
+autocorr.diag(sims)
+geweke.diag(sims)
+```
+It seems like there is a high level of autocorrelation, so using a different
+sampler would help solve the issue.
+
+```{r model2}
+mod <- cmdstan_model(stan_file='hw9.stan')
+
+data_list <- list(x = x,y = y, N = length(dugong$age))
+fit <- mod$sample(data_list,
+                  chains = 4,
+                  sig_figs = 4,
+                  iter_sampling = 12000,
+                  iter_warmup = 2000)
+
+fit$summary(variables = c('lp__','a', 'b', 'g', 'sigma'))
+
+rstan::traceplot(read_stan_csv(fit$output_files()), pars = c('a', 'b', 'g', 'sigma'))
+```
+
+```{r density-plot}
+
+```
+
+

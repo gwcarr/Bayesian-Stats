@@ -1,0 +1,75 @@
+---
+title: "HW8"
+author: "Garrett Carr"
+date: "3/22/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(rstan)
+library(cmdstanr)
+library(loo)
+bond <- read.table('bond.dat', header=T)
+bond$metn <- as.numeric(as.factor(bond$metal))
+bond
+```
+
+```{r multi-mod}
+y <- t(matrix(bond$pressure,3,7))
+tmt <- t(matrix(bond$metn,3,7))
+ming <- t(matrix(bond$ingot,3,7))
+p <- 3
+q <- 7
+bond_mult_dat <- list(p=p,q=q,y=y,tmt=tmt,ming=ming)
+
+# Only run this once
+mod1 <- cmdstan_model('multibond - Copy.stan')
+
+
+```
+
+```{r multi-mod-fit}
+fit <- mod1$sample(bond_mult_dat, chains = 4, parallel_chains = 4, adapt_delta = 0.85)
+fit
+```
+
+
+```{r mixed-mod}
+# Only run once
+
+N <- 21
+p <- 3
+q <- 7
+ingot <- bond$ingot
+metn <- bond$metn
+pressure <- bond$pressure
+bond_dat <- list(N=N,p=p,q=q,ingot=ingot,metn=metn,pressure=pressure)
+
+mod2 <- cmdstan_model('mixedmod.stan')
+```
+
+```{r mixed-mod-sampling}
+fit2 <- mod2$sample(bond_dat, chains = 4, parallel_chains = 4, adapt_delta = 0.95)
+
+fit2$summary()
+```
+
+```{r }
+library(tidyverse)
+```
+It seems like model2 fits better, while model 1 runs into some divergence errors.
+
+I think that it's possible that the mixed model just fits the data better!
+
+One of the issues might be with the vv matrix. I think this has to do with the parameterization of model1, vs model2.
+Non-centered parameterization typically does better.
+
+```{r comparison}
+tbl <- as_tibble(cbind(fit$summary()$mean, fit2$summary()$mean))
+
+colnames(tbl) <- c('multi', 'mixed')
+
+fit$
+```
+

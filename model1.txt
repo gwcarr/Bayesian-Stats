@@ -1,0 +1,12 @@
+
+model {
+for (i in 1:27) {
+  y[i] ~ dnorm(mu[i], 1/s2error)
+  mu[i] = a - b*g^(x[i])
+}
+  a ~ dnorm(3, 0.001)
+  b ~ dgamma(6, 4)
+  g ~ dbeta(5.5, 1.5)
+  s2error ~ dgamma(1.1, 0.05)
+}
+
