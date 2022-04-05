@@ -28,8 +28,11 @@ you will compare the results by examining both equal tail and HPD interval estim
 You should hand in a no more than a one page summary of your results that should include at least one plot.  Make sure to address all appropriate model diagnostics and convergence, but note that you might not be able to fit code output in your one page summary. All code should come in as an appendix to your one 
 page summary. 
 
+
+## Summary
+
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, fig.align = 'center')
+knitr::opts_chunk$set(echo = FALSE, fig.align = 'center', message = FALSE, eval = FALSE)
 library(rstan)
 library(R2jags)
 library(cmdstanr)
@@ -40,8 +43,8 @@ dugong
 
 plot(dugong, ylim = c(0,2.8))
 ```
-
-```{r model1}
+I first ran the model in JAGS, and obtained the following results:
+```{r model1, eval = TRUE}
 model1 <- "
 model {
 for (i in 1:27) {
@@ -68,7 +71,7 @@ dugong.sim <- jags(model.file = 'model1.txt', data = data.jags, parameters.to.sa
 
 dugong.sim
 ```
-```{r model1-diag}
+```{r model1-diag, eval = TRUE, include = FALSE}
 sims <- as.mcmc(dugong.sim)
 gelman.diag(sims)
 chains <- as.matrix(sims)
@@ -78,26 +81,61 @@ effectiveSize(sims)
 autocorr.diag(sims)
 geweke.diag(sims)
 ```
-It seems like there is a high level of autocorrelation, so using a different
-sampler would help solve the issue.
 
-```{r model2}
+```{r jags-results, eval = TRUE}
+HPDinterval(sims, prob = 0.95)
+library(dplyr)
+quantile(sims[,1], c(0.025, 0.975))
+quantile(sims[,2], c(0.025, 0.975))
+quantile(sims[,4], c(0.025, 0.975))
+quantile(sims[,5], c(0.025, 0.975))
+```
+
+
+It seems like there is a high level of autocorrelation for the JAGS output, 
+so using a different sampler would help solve the issue.
+
+```{r model2, eval = TRUE}
 mod <- cmdstan_model(stan_file='hw9.stan')
 
 data_list <- list(x = x,y = y, N = length(dugong$age))
 fit <- mod$sample(data_list,
                   chains = 4,
+                  parallel_chains = 4,
                   sig_figs = 4,
                   iter_sampling = 12000,
                   iter_warmup = 2000)
 
 fit$summary(variables = c('lp__','a', 'b', 'g', 'sigma'))
+```
 
+
+
+Using the NUTS sampler provided with Stan, we have the following traceplots:
+
+```{r model2-fig, eval = TRUE}
 rstan::traceplot(read_stan_csv(fit$output_files()), pars = c('a', 'b', 'g', 'sigma'))
 ```
 
-```{r density-plot}
 
+It appears to be doing pretty well. Lets compare the variables:
+
+
+```{r comparison, eval = TRUE}
+fit$summary(variables = c('a', 'b', 'g', 'sigma'), ~quantile(., probs = c(0.025, 0.975)))
+
+stanfit <- rstan::read_stan_csv(fit$output_files())
+samps <- extract(stanfit)
+chains <- cbind(samps[[1]], samps[[2]], samps[[3]], samps[[4]])
+colnames(chains) <- names(samps[1:4])
+sims <- as.mcmc(chains)
+HPDinterval(sims, prob = 0.95)
 ```
 
+
+### Appendix
+
+```{r ref.label=knitr::all_labels(), echo=TRUE, eval=FALSE}
+
+```
 

@@ -1,0 +1,73 @@
+---
+title: "Homework 10"
+author: 'Garrett Carr'
+output: pdf_document
+---
+
+The code below is the 'best' model for the data example that we have been running in class. For this assignment, we will be analyzing predictive distributions. 
+
+```{r setup}
+growth1 <- read.table('growth.dat')
+colnames(growth1) <- c('sex', 'id', 'agez', 'y')
+growth1$sex <- as.factor(growth1$sex)
+growth1
+```
+
+1. Draw from separate prior predictive distributions for the girls and boys. Graph these distributions on a plot with histograms of the actual boy and girl data.
+
+2. Make observations about the differences between the prior predictive distributions and the true data.
+
+3. Write 2-5 sentences about the importance of understanding data when choosing prior distributions.
+
+```{r, eval=FALSE}
+library(R2jags)
+mdl <- "
+model {
+  for (i in 1:44){
+    y[i] ~ dnorm(mu[i],1/s2g)
+    mu[i] <- b0g[id[i]] + bAgeg[id[i]]*Age[i]
+  }
+  for (i in 45:108){
+    y[i] ~ dnorm(mu[i],1/s2b)
+    mu[i] <- b0b[id[i]] + bAgeb[id[i]]*Age[i]
+  }
+  for (i in 1:11){
+    b0g[i] ~ dnorm(mub0g,1/s2intg)
+    bAgeg[i] ~ dnorm(mub1g,1/s2slpg)
+  }
+  for (i in 1:16){
+    b0b[i] ~ dnorm(mub0b,1/s2intb)
+    bAgeb[i] ~ dnorm(mub1b,1/s2slpb)
+  }
+  s2g ~ dgamma(2,.25)
+  s2b ~ dgamma(2,.25)
+  s2intg ~ dgamma(4,.25)
+  s2intb ~ dgamma(4,.25)
+  s2slpg ~ dgamma(1.1,1)
+  s2slpb ~ dgamma(1.1,1)
+  mub0g ~ dnorm(0,.001)
+  mub0b ~ dnorm(0,.001)
+  mub1g ~ dnorm(0,.001)
+  mub1b ~ dnorm(0,.001)
+}
+"
+writeLines(mdl,'g4.txt')
+y <- growth1$y
+Age <- growth1$agez
+id <- growth1$id
+data.jags <- c('y','Age','id')
+parms <- c('b0g','b0b','bAgeg','bAgeb','mub0g','mub1g','mub0b','mub1b',
+           's2b','s2intb','s2slpb','s2g','s2intg','s2slpg')
+g4.sim <- jags(data=data.jags,inits=NULL,parameters.to.save = parms,
+               model.file = 'g4.txt',n.iter=10000,n.burnin = 2000,
+               n.thin = 2,n.chains = 4)
+g4.sim
+
+```
+
+4. Draw from the posterior distributions of boys and girls. Graph these distributions on a plot with the actual data as in problem 1.
+
+5. Make observations about the differences between the posterior predictive distributions and the true data.
+
+6. Write 2-5 sentences about the model we are fitting (i.e. what the different parameters are, why we fit them, what difference they make, etc. This is very open-ended, just trying to get you to think hard about what we are modeling.)
+

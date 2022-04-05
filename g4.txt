@@ -1,0 +1,30 @@
+
+model {
+  for (i in 1:44){
+    y[i] ~ dnorm(mu[i],1/s2g)
+    mu[i] <- b0g[id[i]] + bAgeg[id[i]]*Age[i]
+  }
+  for (i in 45:108){
+    y[i] ~ dnorm(mu[i],1/s2b)
+    mu[i] <- b0b[id[i]] + bAgeb[id[i]]*Age[i]
+  }
+  for (i in 1:11){
+    b0g[i] ~ dnorm(mub0g,1/s2intg)
+    bAgeg[i] ~ dnorm(mub1g,1/s2slpg)
+  }
+  for (i in 1:16){
+    b0b[i] ~ dnorm(mub0b,1/s2intb)
+    bAgeb[i] ~ dnorm(mub1b,1/s2slpb)
+  }
+  s2g ~ dgamma(2,.25)
+  s2b ~ dgamma(2,.25)
+  s2intg ~ dgamma(4,.25)
+  s2intb ~ dgamma(4,.25)
+  s2slpg ~ dgamma(1.1,1)
+  s2slpb ~ dgamma(1.1,1)
+  mub0g ~ dnorm(0,.001)
+  mub0b ~ dnorm(0,.001)
+  mub1g ~ dnorm(0,.001)
+  mub1b ~ dnorm(0,.001)
+}
+
