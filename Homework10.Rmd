@@ -6,20 +6,14 @@ output: pdf_document
 
 The code below is the 'best' model for the data example that we have been running in class. For this assignment, we will be analyzing predictive distributions. 
 
-```{r setup}
+```{r setup, include = FALSE}
 growth1 <- read.table('growth.dat')
-colnames(growth1) <- c('sex', 'id', 'agez', 'y')
+colnames(growth1) <- c('sex', 'id', 'age', 'y')
 growth1$sex <- as.factor(growth1$sex)
-growth1
+growth1$agez <- growth1$age - 8
 ```
 
-1. Draw from separate prior predictive distributions for the girls and boys. Graph these distributions on a plot with histograms of the actual boy and girl data.
-
-2. Make observations about the differences between the prior predictive distributions and the true data.
-
-3. Write 2-5 sentences about the importance of understanding data when choosing prior distributions.
-
-```{r, eval=FALSE}
+```{r}
 library(R2jags)
 mdl <- "
 model {
@@ -57,7 +51,7 @@ Age <- growth1$agez
 id <- growth1$id
 data.jags <- c('y','Age','id')
 parms <- c('b0g','b0b','bAgeg','bAgeb','mub0g','mub1g','mub0b','mub1b',
-           's2b','s2intb','s2slpb','s2g','s2intg','s2slpg')
+           's2b','s2intb','s2slpb','s2g','s2intg','s2slpg', 'mu')
 g4.sim <- jags(data=data.jags,inits=NULL,parameters.to.save = parms,
                model.file = 'g4.txt',n.iter=10000,n.burnin = 2000,
                n.thin = 2,n.chains = 4)
@@ -65,9 +59,65 @@ g4.sim
 
 ```
 
+1. Draw from separate prior predictive distributions for the girls and boys. Graph these distributions on a plot with histograms of the actual boy and girl data.
+
+```{r part1}
+n <- 1000
+mub0g <- rnorm(n, 0,.001)
+mub1g <- rnorm(n, 0,.001)
+mub0b <- rnorm(n, 0,.001)
+mub1b <- rnorm(n, 0,.001)
+s2b <- rgamma(n, 2, 0.25)
+s2intb <- rgamma(n, 4,.25)
+s2slpb <- rgamma(n, 1.1,1)
+s2g <- rgamma(n, 2, 0.25)
+s2intg <- rgamma(n, 4,.25)
+s2slpg <- rgamma(n, 1.1,1)
+b0g <- dnorm(mub0g, sqrt(s2intg))
+b0b <- dnorm(mub0b,sqrt(s2intb))
+bAgeg <- dnorm(mub1g, sqrt(s2slpg))
+bAgeb <- dnorm(mub1b,sqrt(s2slpb))
+
+yb <- b0b + bAgeb*seq(0,6, by=2) + rnorm(n, 24, sqrt(s2b))
+yg <- b0g + bAgeg*seq(0,6, by=2) + rnorm(n, 24, sqrt(s2g))
+
+plot(x = density(yb), col='blue', main = 'Comparison')
+hist(growth1$y, freq = FALSE, add = T)
+lines(density(yg), col = 'red')
+
+
+```
+Blue is for boys, red for girls.
+
+2. Make observations about the differences between the prior predictive distributions and the true data.
+
+It seems that there is very little differences, probably because they have essentially the same prior.
+
+3. Write 2-5 sentences about the importance of understanding data when choosing prior distributions.
+
+I think it's important that we understand how the different categories in our data compare. If there are measureable differences, we should probably include that information in a weakly informative prior.
+
+
 4. Draw from the posterior distributions of boys and girls. Graph these distributions on a plot with the actual data as in problem 1.
+
+```{r part4}
+library(coda)
+samples <- coda.samples(g4.sim$model,c('mu'), n.iter = 1000)
+sims <- as.matrix(samples)
+
+yg <- sims[,1:44]
+yb <- sims[,45:108]
+
+plot(x = density(yb), col='blue', main = 'Comparison')
+hist(growth1$y, freq = FALSE, add = T)
+lines(density(yg), col = 'red')
+```
+
 
 5. Make observations about the differences between the posterior predictive distributions and the true data.
 
+The posterior predictive makes much more sense, and matches more closely with the data. In particular, there is a clearer difference between the boys and the girls for our predicted values.
+
 6. Write 2-5 sentences about the model we are fitting (i.e. what the different parameters are, why we fit them, what difference they make, etc. This is very open-ended, just trying to get you to think hard about what we are modeling.)
 
+In general, it's really important that we accurately model our data. In essence, modeling is an iterative approach to learning and understanding the data source we are pulling from. I think it's important that we gain understanding throughout the process, rather than approaching this as merely a means to an end.
