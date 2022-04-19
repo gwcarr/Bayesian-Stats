@@ -1,6 +1,6 @@
 ---
 title: "Final"
-author: "Stat 451"
+author: "Garrett Carr"
 date: "April 14, 2022"
 output: pdf_document
 ---
@@ -20,36 +20,92 @@ ask for help from any person currently alive in the mortal state.
 The first question in worth 75 points and should be the focus until you believe you have 
 completed it.  The second question is worth 25 points.
 
-1. On an annual basis, each county Assessor is required by Utah law to list and value on
-an assessment roll all property subject to *ad valorem* taxation. Iron County is located
-in southwest Utah approximately 265 miles south of Salt Lake City, UT and 170 miles
-north of Las Vegas, NV on the I-15 corridor. The Iron County Assessor’s office assesses
-values on approximately 35,000 parcels of property on approximately 620,000 acres.
 
-The data file *ironco.txt*, will be mailed to you, contains data on selling price for various properties, as well
-as information of covariates that may be related to selling price.  The columns are described
-below:
+```{r setup}
+knitr::opts_chunk$set(fig.align = 'center')
+library(rstan)
+library(cmdstanr)
+library(tidyverse)
+library(GGally)
 
-* obs - observation number (in quotes)
-* price - selling price of the property
-* lot - lot acreage
-* floors - number of floors (not including basement)
-* const - assessed construction quality on a scale of 1 (poor) to 4 (excellent)
-* roof - assessed roof condition on a scale of 1 (poor) to 4 (excellent)
-* build - assessed home condition on a scale of 1 (poor) to 4 (excellent)
-* area - square footage of home
-* yr.built - year the home was built
-* eff.age - evaluation by the assessor of the home's equivalent market age
-* baths - number of full bathrooms
-* gar - indicator for presence of a garage
-* basmt - indicator of presence of a basement
+iron <- read_table('ironco.txt', skip = 1, 
+                   col_names = c('obs', 'price', 'lot', 'floors', 'const', 'roof', 'build', 'area', 'yr.built', 'eff.age', 'baths', 'gar', 'basmt'))
 
-Make the response the square root of price and write a model to estimate the response based on an intercept, 
-the area of the home, the assessed roof condition, and the indicator for the presence of a basement.
-The likelihood is normal.  Make your priors for the $\beta$'s fairly flat and use a gamma prior for the
-error variance with parameters shape=3 and rate=.1.  Run the model in JAGS or Stan.
-Make sure the chains have converged using the methods we have covered in class.  Show the 95\% equal tail interval estimates for $\beta_\text{area}$.  Plot the 
-posterior density of $\beta_\text{area}$.
+# CLEAN-UP
+iron$obs <- str_trim(iron$obs) |> str_replace_all('"', "")
+iron$basmt <- as_factor(iron$basmt)
+iron$roof <- as_factor(iron$roof)
+
+iron
+
+data_list <- list(N = length(iron$obs), price = iron$price, area = iron$area, roof = iron$roof, basmt = iron$basmt)
+
+# EDA
+iron |> select(price, roof, area, basmt) |> ggpairs()
+```
+
+1. On an annual basis, each county Assessor is required by Utah law to list and value on an assessment roll all property subject to *ad valorem* taxation. 
+  Iron County is located in southwest Utah approximately 265 miles south of Salt Lake City, UT and 170 miles north of Las Vegas, NV on the I-15 corridor. 
+  The Iron County Assessor’s office assesses values on approximately 35,000 parcels of property on approximately 620,000 acres.
+
+  The data file *ironco.txt*, will be mailed to you, contains data on selling price for various properties, as well
+  as information of covariates that may be related to selling price.  The columns are described below:
+
+  * obs - observation number (in quotes)
+  * price - selling price of the property
+  * lot - lot acreage
+  * floors - number of floors (not including basement)
+  * const - assessed construction quality on a scale of 1 (poor) to 4 (excellent)
+  * roof - assessed roof condition on a scale of 1 (poor) to 4 (excellent)
+  * build - assessed home condition on a scale of 1 (poor) to 4 (excellent)
+  * area - square footage of home
+  * yr.built - year the home was built
+  * eff.age - evaluation by the assessor of the home's equivalent market age
+  * baths - number of full bathrooms
+  * gar - indicator for presence of a garage
+  * basmt - indicator of presence of a basement
+
+  Make the response the square root of price and write a model to 
+  estimate the response based on an intercept, 
+  the area of the home, 
+  the assessed roof condition, 
+  and the indicator for the presence of a basement.
+
+  The likelihood is normal.  
+  Make your priors for the $\beta$'s fairly flat and use a gamma prior for the
+  error variance with parameters shape=3 and rate=.1.
+
+  Run the model in JAGS or Stan.
+
+  Make sure the chains have converged using the methods we have covered in class.  
+
+  Show the 95\% equal tail interval estimates for $\beta_\text{area}$.  
+
+  Plot the posterior density of $\beta_\text{area}$.
+  
+```{r part1-model}
+mod <- cmdstan_model('mod1.stan')
+mod$print()
+```
+  
+```{r model1}
+fit <- mod$sample(
+  data = data_list,
+  seed = 324,
+  chains = 6,
+  parallel_chains = 3,
+  refresh = 500,
+  sig_figs = 5
+)
+
+fit$summary(variables = c('serr', 'beta0', 'barea', 'broof', 'bbasmt'))
+
+fit$cmdstan_diagnose()
+```
+```{r part1-addtnl-diag}
+
+```
+  
 
 2. The data we are considering are from the Body Project, a dissonance based eating disorder prevention
 intervention.  Female adolescents were randomized to one of four conditions: the dissonance intervention
