@@ -1,0 +1,186 @@
+---
+title: "Final"
+author: "Garrett Carr"
+date: "April 14, 2022"
+output: pdf_document
+---
+
+This is a take-home exam.  The final will be due at midnight on Tuesday, April
+19.  When you finish, email
+me your exam with the subject ‘Stat 451 Final’. Please
+do your work in a .Rmd file so that I can see your code.  Please hand in both your .Rmd file and either an .html
+file, a .pdf file, or a .doc file.  Please name your files with your last name first, so my files would be named:
+'FellinghamFinal.Rmd' and 'FellinghamFinal.pdf', 'FellinghamFinal.html' or
+'FellinghamFinal.doc'.
+
+As always, I expect your final to be your own work.  You may use any notes and any help files available
+for the programs, but searching for similar code on the web would not be appropriate.  You should not
+ask for help from any person currently alive in the mortal state.
+
+The first question in worth 75 points and should be the focus until you believe you have 
+completed it.  The second question is worth 25 points.
+
+
+```{r setup, message=FALSE}
+knitr::opts_chunk$set(fig.align = 'center')
+library(rstan)
+library(cmdstanr)
+library(tidyverse)
+library(GGally)
+library(bayesplot)
+
+iron <- read_table('ironco.txt', skip = 1, 
+                   col_names = c('obs', 'price', 'lot', 'floors', 'const', 'roof', 'build', 'area', 'yr.built', 'eff.age', 'baths', 'gar', 'basmt'))
+
+# CLEAN-UP
+iron$obs <- str_trim(iron$obs) |> str_replace_all('"', "")
+iron$basmt <- as_factor(iron$basmt)
+iron$roof <- as_factor(iron$roof)
+
+iron
+
+data_list <- list(N = length(iron$obs), price = iron$price, 
+                  area = iron$area, roof = iron$roof, basmt = iron$basmt)
+
+# EDA
+iron |> 
+  mutate(pricesqrt = sqrt(price)) |> 
+  select(pricesqrt, roof, area, basmt) |> 
+  ggpairs()
+```
+
+1. On an annual basis, each county Assessor is required by Utah law to list and value on an assessment roll all property subject to *ad valorem* taxation. 
+  Iron County is located in southwest Utah approximately 265 miles south of Salt Lake City, UT and 170 miles north of Las Vegas, NV on the I-15 corridor. 
+  The Iron County Assessor’s office assesses values on approximately 35,000 parcels of property on approximately 620,000 acres.
+
+  The data file *ironco.txt*, will be mailed to you, contains data on selling price for various properties, as well
+  as information of covariates that may be related to selling price.  The columns are described below:
+
+  * obs - observation number (in quotes)
+  * price - selling price of the property
+  * lot - lot acreage
+  * floors - number of floors (not including basement)
+  * const - assessed construction quality on a scale of 1 (poor) to 4 (excellent)
+  * roof - assessed roof condition on a scale of 1 (poor) to 4 (excellent)
+  * build - assessed home condition on a scale of 1 (poor) to 4 (excellent)
+  * area - square footage of home
+  * yr.built - year the home was built
+  * eff.age - evaluation by the assessor of the home's equivalent market age
+  * baths - number of full bathrooms
+  * gar - indicator for presence of a garage
+  * basmt - indicator of presence of a basement
+
+  Make the response the square root of price and write a model to 
+  estimate the response based on an intercept, 
+  the area of the home, 
+  the assessed roof condition, 
+  and the indicator for the presence of a basement.
+
+  The likelihood is normal.  
+  Make your priors for the $\beta$'s fairly flat and use a gamma prior for the
+  error variance with parameters shape=3 and rate=.1.
+
+  Run the model in JAGS or Stan.
+
+  Make sure the chains have converged using the methods we have covered in class.  
+
+  Show the 95\% equal tail interval estimates for $\beta_\text{area}$.  
+
+  Plot the posterior density of $\beta_\text{area}$.
+  
+```{r part1-model}
+mod <- cmdstan_model('mod1.stan')
+mod$print()
+```
+  
+```{r model1}
+fit <- mod$sample(
+  data = data_list,
+  seed = 324,
+  chains = 6,
+  parallel_chains = 3,
+  refresh = 1000,
+  sig_figs = 5,
+  iter_sampling = 3000
+)
+
+fit$summary(variables = c('serr', 'beta0', 'barea', 'broof', 'bbasmt', 'lp__'))
+
+fit$cmdstan_diagnose()
+```
+  The rhat and effictive sample sizes (in bulk and for the tails) are 
+  right where they should be for the above parameters, 
+  with an rhat below 1.05, and high effective sample sizes, including for the
+  log-probability. 
+  This indicates convergence.  
+  
+  Below are some of the diagnostics we did in class:
+  
+
+```{r part1-addtnl-diag}
+library(coda)
+stanfit <- rstan::read_stan_csv(fit$output_files())
+
+samps <- rstan::extract(stanfit)
+chains <- cbind(samps[[1]], samps[[2]], samps[[3]], samps[[4]], samps[[5]])
+colnames(chains) <- c("beta0","barea","broof","bbasmt","serr")
+sims <- as.mcmc(chains)
+effectiveSize(sims)
+raftery.diag(sims)
+
+# Traceplots
+mcmc_trace(fit$draws(), pars = c("beta0","barea","broof","bbasmt","serr"))
+```
+  
+  This confirms within chain and global convergence.
+  
+  Here is the 95% equal tail estimates for `barea`.
+  
+```{r part1-quantiles}
+fit$draws(variables = 'barea', format = 'draws_matrix') |> 
+  quantile(c(0.025, 0.975))
+```
+  
+  Here is the associated posterior density for the chains:
+```{r part1-dens}
+mcmc_dens_chains(fit$draws('barea'))
+```
+  
+
+2. The data we are considering are from the Body Project, a dissonance based eating disorder prevention intervention.  
+   Female adolescents were randomized to one of four conditions: the dissonance intervention (DI; n=114), 
+   a healthy-weight management program (HW; n=117), 
+   an expressive writing control (EW, n=123),
+   and an assessment-only control (AO; n=126).  
+   For the purposes of this exam, we are only considering two treatments, DI and AO. The DI treatment was delivered to groups of participants, 
+   (average group size=6.7). The AO treatment was delivered to individuals.  
+   We would expect the responses in the DI groups to show some
+within group correlation.  The researchers' question of interest was whether the DI treatment lowered the response (called TII2 in the data file).  
+
+   The data file (called *bp.dat*) will be emailed to you.  There are seven columns in the data file.  The first column is a subject id that has issues because we are only looking at two treatments.  The second column is a groupid that also had some issues.
+   Ignore the first two columns.  The next column is the treatment condition.  It is 0 for the DI treatment and 3 for the AO treatment, the only two you care about.
+   The next column is labeled DIS and it also is a treatment indicator, 1 for the DI treatment and 0 for the AO treatment.
+   These two columns have identical information.
+   The next column is TII2, which is the response of interest.  The final two columns are subject id and group id that have been fixed up for this data set.
+
+   There are many ways to think about a model in this case.  I think the most reasonable one for us is a hierarchical model, as there are multiple sources of variability.Subject variability in both the AO and DI treatments, as well as group variability for the DI treatment.
+   For picking priors you should be aware that all the variance components for this data are fairly small (all less than 1).  
+   You should write code to evaluate the conjecture that DI is a better treatment than AO.
+
+  The most important item you will hand in is your code, either JAGS or Stan. 
+  If you get your code to run I would also like to see 
+  convergence diagnostics, 
+  a summary output table, 
+  an equal tail interval for the parameter used to indicate the possible presence of a treatment effect, 
+  and a plot of the posterior density of this same parameter.
+
+```{r setup2, message=FALSE}
+dat <- read_table('bp.dat')
+colnames(dat) <- colnames(dat) |> str_replace_all('"', "")
+dat <- dat |> select(-ID, -GROUPID, - TXCOND)
+n_DI <- sum(dat$DIS)
+n_AO <- length(dat$DIS) - sum(dat$DIS)
+
+dat
+```
+
