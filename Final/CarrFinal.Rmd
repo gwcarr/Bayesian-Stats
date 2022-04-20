@@ -178,9 +178,55 @@ within group correlation.  The researchers' question of interest was whether the
 dat <- read_table('bp.dat')
 colnames(dat) <- colnames(dat) |> str_replace_all('"', "")
 dat <- dat |> select(-ID, -GROUPID, - TXCOND)
-n_DI <- sum(dat$DIS)
-n_AO <- length(dat$DIS) - sum(dat$DIS)
 
-dat
+# Fixing group ID's for individuals, to be continuous
+
+dat[115:length(dat$DIS),]$grpid1 <- 18:143
+
+data_list <- list(n_DI = sum(dat$DIS), 
+                  n_AO = length(dat$DIS) - sum(dat$DIS),
+                  n_grp = length(table(dat$grpid1)),
+                  N = length(dat$TII2),
+                  TII2 = dat$TII2,
+                  tmt = dat$DIS,
+                  n_tmt = 2,
+                  id = dat$id,
+                  groupid = dat$grpid1)
+
 ```
 
+  It seems that the individuals who participated in DI treatment participated in groups, while those who did AO on their own were part of their own group. I
+  
+```{r mod2, message=FALSE}
+mod <- cmdstan_model('mod2.stan')
+
+fit <- mod$sample(
+  data = data_list,
+  seed = 324,
+  chains = 6,
+  parallel_chains = 3,
+  refresh = 1000,
+  sig_figs = 5,
+  iter_sampling = 2000
+)
+```
+```{r part2-summary}
+fit$summary()
+```
+The model I wrote is not ideal, after struggling to come up with something better,
+I believe the best model would be perhaps a logistic regression model, or perhaps 
+the model would run better by computing the difference between the two means.
+
+I think since there is very little difference between the individuals, the model
+is having a hard time picking up the differences. 
+
+I tried squaring the response to get better scaling, but I think the problem lies 
+with my chosen model.
+
+I tried to account for the different sources of variablity, but it made the model too complicated.
+
+I could do some research on the factors that go into these scores. My analysis 
+isn't very useful anyways because I don't have the knowledge of how these
+scores were determined, or created. 
+
+This is the best I can do with the times and resources I have been given.

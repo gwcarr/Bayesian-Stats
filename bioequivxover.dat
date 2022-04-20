@@ -1,0 +1,12 @@
+Subject   Tmt1  Response1  PrevTmt  Tmt2  Response2
+1         A       1.40       A       B    1.65
+2         A       1.64       A       B    1.57
+3         B       1.44       B       A    1.58
+4         B       1.36       B       A    1.68
+5         B       1.65       B       A    1.69
+6         A       1.08       A       B    1.31
+7         A       1.09       A       B    1.43
+8         A       1.25       A       B    1.44
+9         B       1.25       B       A    1.39
+10        B       1.30       B       A    1.52
+
